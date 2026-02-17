@@ -1,0 +1,27 @@
+version: 2
+
+models:
+  - name: fct_portfolio_waci
+    description: >
+      Weighted Average Carbon Intensity (WACI) per portfolio.
+      WACI = sum of (portfolio_weight * carbon_intensity) across all holdings.
+      Units: tonnes CO2e per USD of revenue.
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: portfolio_id
+        description: "Portfolio identifier"
+        data_type: varchar
+      - name: as_of_date
+        description: "Computation date"
+        data_type: date
+      - name: waci
+        description: "Weighted Average Carbon Intensity (tonnes CO2e / USD revenue)"
+        data_type: double
+      - name: total_market_value
+        description: "Total portfolio market value in local currency"
+        data_type: double
+      - name: num_holdings
+        description: "Number of holdings in the portfolio"
+        data_type: bigint

@@ -1,0 +1,56 @@
+version: 2
+
+models:
+  - name: stg_portfolio_positions
+    description: "Staged portfolio positions with typed columns"
+    columns:
+      - name: portfolio_id
+        description: "Unique portfolio identifier"
+        data_type: varchar
+      - name: security_id
+        description: "Unique security identifier"
+        data_type: varchar
+      - name: quantity
+        description: "Number of shares/units held"
+        data_type: double
+      - name: as_of_date
+        description: "Position snapshot date"
+        data_type: date
+
+  - name: stg_market_data
+    description: "Staged market prices with typed columns"
+    columns:
+      - name: security_id
+        description: "Unique security identifier"
+        data_type: varchar
+      - name: price
+        description: "Market price per share/unit"
+        data_type: double
+      - name: currency
+        description: "Price currency (ISO 4217)"
+        data_type: varchar
+      - name: as_of_date
+        description: "Price observation date"
+        data_type: date
+
+  - name: stg_carbon_scores
+    description: "Staged carbon scores with derived carbon intensity"
+    columns:
+      - name: security_id
+        description: "Unique security identifier"
+        data_type: varchar
+      - name: company_name
+        description: "Company name"
+        data_type: varchar
+      - name: carbon_emissions_tonnes
+        description: "Total carbon emissions in metric tonnes"
+        data_type: double
+      - name: revenue_usd
+        description: "Total revenue in USD"
+        data_type: double
+      - name: carbon_intensity
+        description: "Carbon intensity = emissions / revenue (tonnes per USD)"
+        data_type: double
+      - name: as_of_date
+        description: "Carbon data observation date"
+        data_type: date

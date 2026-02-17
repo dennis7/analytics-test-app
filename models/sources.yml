@@ -1,0 +1,43 @@
+version: 2
+
+sources:
+  - name: upstream
+    description: "Upstream data sources in parquet format"
+    tables:
+      - name: portfolio_positions
+        description: "Portfolio holdings with quantities per security"
+        columns:
+          - name: portfolio_id
+            description: "Unique portfolio identifier"
+          - name: security_id
+            description: "Unique security identifier"
+          - name: quantity
+            description: "Number of shares/units held"
+          - name: as_of_date
+            description: "Date of the position snapshot"
+
+      - name: market_data
+        description: "Market prices for securities"
+        columns:
+          - name: security_id
+            description: "Unique security identifier"
+          - name: price
+            description: "Market price per share/unit"
+          - name: currency
+            description: "Price currency (ISO 4217)"
+          - name: as_of_date
+            description: "Date of the price observation"
+
+      - name: carbon_scores
+        description: "Alternate data - carbon emissions and revenue for carbon intensity calculation"
+        columns:
+          - name: security_id
+            description: "Unique security identifier"
+          - name: company_name
+            description: "Company name"
+          - name: carbon_emissions_tonnes
+            description: "Total carbon emissions in metric tonnes"
+          - name: revenue_usd
+            description: "Total revenue in USD"
+          - name: as_of_date
+            description: "Date of the carbon data observation"

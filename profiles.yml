@@ -1,0 +1,23 @@
+test_app:
+  target: dev
+
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('DBT_DUCKDB_PATH', 'output/dev/dev.duckdb') }}"
+      threads: 4
+
+    sit:
+      type: duckdb
+      path: "{{ env_var('DBT_DUCKDB_PATH', 'output/sit/sit.duckdb') }}"
+      threads: 4
+
+    uat:
+      type: duckdb
+      path: "{{ env_var('DBT_DUCKDB_PATH', 'output/uat/uat.duckdb') }}"
+      threads: 4
+
+    prd:
+      type: duckdb
+      path: "{{ env_var('DBT_DUCKDB_PATH', 'output/prd/prd.duckdb') }}"
+      threads: 8
