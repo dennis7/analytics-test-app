@@ -1,11 +1,11 @@
 [project]
-name = "test-app"
+name = "waci-workspace"
 version = "0.1.0"
-description = "dbt project for computing Weighted Average Carbon Intensity (WACI) for portfolios"
-readme = "README.md"
+description = "WACI data pipeline monorepo - dbt and SQLMesh implementations"
 requires-python = ">=3.12"
 dependencies = [
     "dbt-duckdb>=1.10",
+    "sqlmesh[duckdb]>=0.142",
     "pyarrow>=19.0",
 ]
 
@@ -13,6 +13,9 @@ dependencies = [
 dev = [
     "ruff>=0.11",
 ]
+
+[tool.uv.workspace]
+members = ["packages/*"]
 
 [tool.ruff]
 target-version = "py312"
@@ -28,6 +31,3 @@ select = [
     "B",   # flake8-bugbear
     "SIM", # flake8-simplify
 ]
-
-[tool.ruff.lint.isort]
-known-first-party = ["test_app"]
