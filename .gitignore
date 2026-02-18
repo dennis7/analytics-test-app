@@ -13,8 +13,14 @@ wheels/
 target/
 dbt_packages/
 logs/
+
+# SQLMesh
+.cache/
+
+# Shared
 output/
 
 # Local config
 .user.yml
 .vscode/
+.ruff_cache/

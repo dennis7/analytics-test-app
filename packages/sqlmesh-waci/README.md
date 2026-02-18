@@ -2,6 +2,8 @@
 
 A SQLMesh project for computing **Weighted Average Carbon Intensity (WACI)** for investment portfolios, powered by DuckDB.
 
+> Part of the [WACI Monorepo](../../README.md). See also the [dbt implementation](../dbt-waci/).
+
 ## Prerequisites
 
 - [Python 3.12+](https://www.python.org/downloads/)
@@ -10,7 +12,7 @@ A SQLMesh project for computing **Weighted Average Carbon Intensity (WACI)** for
 ## Quick Start
 
 ```bash
-# Install Python dependencies
+# From this directory (packages/sqlmesh-waci/)
 uv sync
 
 # Run the full pipeline (plan + apply)
@@ -20,7 +22,7 @@ uv run sqlmesh plan --auto-apply
 ## Project Structure
 
 ```
-.
+packages/sqlmesh-waci/
 ├── data/                      # Seed data (parquet) per environment
 │   ├── generate_seed_data.py  # Script to regenerate seed parquet files
 │   ├── dev/
@@ -87,29 +89,11 @@ To regenerate the parquet seed files:
 uv run python data/generate_seed_data.py
 ```
 
-## Linting & Formatting
-
-This project uses [ruff](https://docs.astral.sh/ruff/) for Python linting and formatting.
-
-```bash
-# Check for lint issues
-uv run ruff check .
-
-# Auto-fix lint issues
-uv run ruff check --fix .
-
-# Check formatting
-uv run ruff format --check .
-
-# Apply formatting
-uv run ruff format .
-```
-
 ## Key Dependencies
 
-| Package          | Version |
-|------------------|---------|
-| Python           | >= 3.12 |
+| Package          | Version  |
+|------------------|----------|
+| Python           | >= 3.12  |
 | sqlmesh[duckdb]  | >= 0.142 |
-| pyarrow          | >= 19.0 |
-| ruff (dev)       | >= 0.11 |
+| pyarrow          | >= 19.0  |
+| ruff (dev)       | >= 0.11  |
