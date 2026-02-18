@@ -7,6 +7,8 @@ dependencies = [
     "dbt-duckdb>=1.10",
     "sqlmesh[duckdb]>=0.142",
     "pyarrow>=19.0",
+    "mcp>=1.0",
+    "duckdb>=1.0",
 ]
 
 [dependency-groups]

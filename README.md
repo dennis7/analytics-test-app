@@ -16,11 +16,14 @@ A monorepo containing **two parallel implementations** of a Weighted Average Car
 │   │   ├── profiles.yml
 │   │   └── packages.yml
 │   │
-│   └── sqlmesh/                   # SQLMesh implementation
-│       ├── models/                #   staging / intermediate / marts
-│       ├── audits/                #   data quality audits
-│       ├── data/                  #   seed parquet files (dev/sit/uat/prd)
-│       └── config.yaml
+│   ├── sqlmesh/                   # SQLMesh implementation
+│   │   ├── models/                #   staging / intermediate / marts
+│   │   ├── audits/                #   data quality audits
+│   │   ├── data/                  #   seed parquet files (dev/sit/uat/prd)
+│   │   └── config.yaml
+│   │
+│   └── mcp/                       # MCP server for conversational data access
+│       └── server.py              #   FastMCP server (stdio transport)
 │
 ├── pyproject.toml                 # Workspace root (shared deps, single venv)
 ├── uv.lock                        # Single lockfile for all packages
@@ -74,8 +77,9 @@ Each package under `packages/` has its own `pyproject.toml` declaring only its s
 |---------|---------------|
 | `packages/dbt/` | `dbt-duckdb>=1.10` |
 | `packages/sqlmesh/` | `sqlmesh[duckdb]>=0.142` |
+| `packages/mcp/` | `mcp>=1.0`, `duckdb>=1.0` |
 
-The root `pyproject.toml` aggregates both and adds shared dev dependencies (ruff). Shared tool config (ruff rules, Python version) lives at the root.
+The root `pyproject.toml` aggregates everything and adds shared dev dependencies (ruff). Shared tool config (ruff rules, Python version) lives at the root.
 
 ### Running commands
 
@@ -149,6 +153,54 @@ Both implementations include 11 data quality checks covering:
 **dbt** implements these as singular SQL tests in `tests/`.
 **SQLMesh** implements these as audits in `audits/`, attached directly to model definitions.
 
+## MCP Server
+
+The `packages/mcp/` package provides an [MCP](https://modelcontextprotocol.io/) server for conversational exploration of the pipeline data. It connects to the DuckDB output and exposes tools an LLM can call to query portfolios, holdings, carbon scores, and WACI metrics.
+
+### Available tools
+
+| Tool | Description |
+|------|-------------|
+| `list_tables` | Show all tables with row counts |
+| `describe_table` | Column names, types, and sample values |
+| `query` | Run arbitrary read-only SQL |
+| `portfolio_summary` | WACI, market value, holdings per portfolio |
+| `holdings_breakdown` | Per-security carbon impact for a portfolio |
+| `top_carbon_contributors` | Securities ranked by carbon intensity |
+| `compare_portfolios` | Side-by-side portfolio comparison |
+
+### Usage with Claude Desktop
+
+Add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "waci": {
+      "command": "uv",
+      "args": ["run", "python", "packages/mcp/server.py"],
+      "cwd": "/path/to/this/repo"
+    }
+  }
+}
+```
+
+### Flags
+
+```bash
+# Default: dbt dev database
+uv run python packages/mcp/server.py
+
+# SQLMesh database
+uv run python packages/mcp/server.py --pipeline sqlmesh
+
+# Specific environment
+uv run python packages/mcp/server.py --pipeline dbt --env prd
+
+# Explicit path
+uv run python packages/mcp/server.py --db /path/to/any.duckdb
+```
+
 ## Regenerating Seed Data
 
 Both packages include a `data/generate_seed_data.py` script:
@@ -172,3 +224,4 @@ uv run ruff format --check .
 - [SQLMesh vs dbt: Detailed Comparison](SQLMESH_VS_DBT.md) -- pros, cons, tradeoffs, integrations with Databricks, Spark, DuckDB, Delta Lake, and Iceberg
 - [dbt Package README](packages/dbt/README.md) -- dbt-specific commands and configuration
 - [SQLMesh Package README](packages/sqlmesh/README.md) -- SQLMesh-specific commands and configuration
+- [MCP Server](packages/mcp/server.py) -- conversational data exploration via MCP
