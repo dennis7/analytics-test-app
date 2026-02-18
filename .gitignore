@@ -18,8 +18,8 @@ logs/
 .cache/
 
 # Shared
-output/**/*.duckdb
-output/**/*.duckdb.wal
+**/output/**/*.duckdb
+**/output/**/*.duckdb.wal
 
 # Local config
 .user.yml
