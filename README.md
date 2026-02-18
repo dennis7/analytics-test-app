@@ -7,103 +7,86 @@ A monorepo containing **two parallel implementations** of a Weighted Average Car
 ```
 .
 ├── packages/
-│   ├── dbt-waci/              # dbt implementation
-│   │   ├── models/            #   staging / intermediate / marts
-│   │   ├── tests/             #   data quality tests
-│   │   ├── macros/            #   reusable SQL macros
-│   │   ├── data/              #   seed parquet files (dev/sit/uat/prd)
+│   ├── dbt/                       # dbt implementation
+│   │   ├── models/                #   staging / intermediate / marts
+│   │   ├── tests/                 #   data quality tests
+│   │   ├── macros/                #   reusable SQL macros
+│   │   ├── data/                  #   seed parquet files (dev/sit/uat/prd)
 │   │   ├── dbt_project.yml
 │   │   ├── profiles.yml
-│   │   ├── packages.yml
-│   │   └── pyproject.toml
+│   │   └── packages.yml
 │   │
-│   └── sqlmesh-waci/          # SQLMesh implementation
-│       ├── models/            #   staging / intermediate / marts
-│       ├── audits/            #   data quality audits
-│       ├── data/              #   seed parquet files (dev/sit/uat/prd)
-│       ├── config.yaml
-│       └── pyproject.toml
+│   └── sqlmesh/                   # SQLMesh implementation
+│       ├── models/                #   staging / intermediate / marts
+│       ├── audits/                #   data quality audits
+│       ├── data/                  #   seed parquet files (dev/sit/uat/prd)
+│       └── config.yaml
 │
-├── SQLMESH_VS_DBT.md          # Detailed comparison: SQLMesh vs dbt
-└── README.md                  # This file
+├── pyproject.toml                 # Workspace root (shared deps, single venv)
+├── uv.lock                        # Single lockfile for all packages
+├── SQLMESH_VS_DBT.md              # Detailed comparison: SQLMesh vs dbt
+└── README.md                      # This file
 ```
 
 ## Prerequisites
 
 - [Python 3.12+](https://www.python.org/downloads/)
-- [uv](https://docs.astral.sh/uv/getting-started/installation/) (fast Python package manager)
+- [uv](https://docs.astral.sh/uv/getting-started/installation/)
 
 ## Quick Start
 
-Each package is self-contained with its own `pyproject.toml` and virtual environment. You run them independently from their respective directories.
-
-### Running the dbt pipeline
-
 ```bash
-cd packages/dbt-waci
-
-# Install dependencies
+# Install all dependencies (one shared venv for the entire workspace)
 uv sync
 
 # Install dbt packages (dbt_utils)
-uv run dbt deps
+cd packages/dbt && uv run dbt deps && cd ../..
 
-# Run the full pipeline (models + tests)
-uv run dbt build
-```
+# Run dbt pipeline
+cd packages/dbt && uv run dbt build && cd ../..
 
-### Running the SQLMesh pipeline
-
-```bash
-cd packages/sqlmesh-waci
-
-# Install dependencies
-uv sync
-
-# Run the full pipeline (plan + apply)
-uv run sqlmesh plan --auto-apply
-```
-
-### Running both pipelines
-
-```bash
-# From the repo root -- run both back to back
-(cd packages/dbt-waci && uv sync && uv run dbt deps && uv run dbt build) && \
-(cd packages/sqlmesh-waci && uv sync && uv run sqlmesh plan --auto-apply)
+# Run SQLMesh pipeline
+cd packages/sqlmesh && uv run sqlmesh plan --auto-apply && cd ../..
 ```
 
 ## How the Monorepo Works
 
-### Independent packages, shared data schema
+This project uses a **[uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/)** -- a single Python environment that serves both the dbt and SQLMesh packages.
 
-Each package under `packages/` is a **fully independent project** with its own:
+### One venv, one lockfile
 
-- `pyproject.toml` -- Python dependencies and tool configuration
-- `.venv` -- isolated virtual environment (created by `uv sync`)
-- Configuration files -- `dbt_project.yml` + `profiles.yml` for dbt, `config.yaml` for SQLMesh
-- Seed data -- identical parquet files in `data/{dev,sit,uat,prd}/`
+The root `pyproject.toml` defines a `[tool.uv.workspace]` with `members = ["packages/*"]`. Running `uv sync` from the repo root:
 
-There is **no shared Python dependency resolution** between packages. This means:
-- You can upgrade dbt without affecting SQLMesh and vice versa
-- Each package can pin its own versions independently
-- Virtual environments are isolated -- no cross-contamination
+1. Resolves **all** dependencies (dbt + SQLMesh + shared) into a single `uv.lock`
+2. Creates **one** `.venv` at the repo root
+3. Installs workspace members as editable packages
 
-### Why a monorepo?
+This means:
+- `uv run dbt build` and `uv run sqlmesh plan` both work from the same venv
+- No duplicate installs of shared dependencies like `pyarrow`
+- Dependency versions are guaranteed consistent across both packages
 
-1. **Apples-to-apples comparison** -- same data, same pipeline logic, different frameworks
-2. **Shared documentation** -- the [comparison guide](SQLMESH_VS_DBT.md) lives at the root, referencing both implementations
-3. **Single git history** -- changes to the pipeline logic can be committed atomically across both implementations
-4. **Easy onboarding** -- clone once, explore both frameworks
+### Workspace members
 
-### Package layout convention
+Each package under `packages/` has its own `pyproject.toml` declaring only its specific dependencies:
 
-```
-packages/
-  <name>/
-    pyproject.toml     # uv/pip project definition
-    data/              # seed data (parquet files per environment)
-    models/            # SQL transformation models
-    ...                # framework-specific files (tests, audits, macros, configs)
+| Package | Key dependency |
+|---------|---------------|
+| `packages/dbt/` | `dbt-duckdb>=1.10` |
+| `packages/sqlmesh/` | `sqlmesh[duckdb]>=0.142` |
+
+The root `pyproject.toml` aggregates both and adds shared dev dependencies (ruff). Shared tool config (ruff rules, Python version) lives at the root.
+
+### Running commands
+
+Both tools are available from the root venv. Run them from their respective package directory so they find their config files:
+
+```bash
+# dbt (needs to be in packages/dbt/ for dbt_project.yml)
+cd packages/dbt && uv run dbt build
+
+# SQLMesh (needs to be in packages/sqlmesh/ for config.yaml)
+cd packages/sqlmesh && uv run sqlmesh plan --auto-apply
 ```
 
 ## The WACI Pipeline
@@ -146,18 +129,12 @@ Both implementations support four environments with progressively larger dataset
 
 ### Targeting environments
 
-**dbt:**
 ```bash
-uv run dbt build --target sit
-uv run dbt build --target uat
-uv run dbt build --target prd
-```
+# dbt
+cd packages/dbt && uv run dbt build --target sit
 
-**SQLMesh:**
-```bash
-# SQLMesh uses gateway config for different environments
-# Default: dev (configured in config.yaml)
-uv run sqlmesh plan --auto-apply
+# SQLMesh (default: dev, configured in config.yaml)
+cd packages/sqlmesh && uv run sqlmesh plan --auto-apply
 ```
 
 ## Data Quality
@@ -177,19 +154,15 @@ Both implementations include 11 data quality checks covering:
 Both packages include a `data/generate_seed_data.py` script:
 
 ```bash
-# dbt seed data
-cd packages/dbt-waci && uv run python data/generate_seed_data.py
-
-# SQLMesh seed data
-cd packages/sqlmesh-waci && uv run python data/generate_seed_data.py
+uv run python packages/dbt/data/generate_seed_data.py
+uv run python packages/sqlmesh/data/generate_seed_data.py
 ```
 
 ## Linting
 
-Both packages use [ruff](https://docs.astral.sh/ruff/) for Python linting:
+Ruff config lives in the root `pyproject.toml` and applies to both packages:
 
 ```bash
-# From either package directory
 uv run ruff check .
 uv run ruff format --check .
 ```
@@ -197,5 +170,5 @@ uv run ruff format --check .
 ## Further Reading
 
 - [SQLMesh vs dbt: Detailed Comparison](SQLMESH_VS_DBT.md) -- pros, cons, tradeoffs, integrations with Databricks, Spark, DuckDB, Delta Lake, and Iceberg
-- [dbt Package README](packages/dbt-waci/README.md) -- dbt-specific commands and configuration
-- [SQLMesh Package README](packages/sqlmesh-waci/README.md) -- SQLMesh-specific commands and configuration
+- [dbt Package README](packages/dbt/README.md) -- dbt-specific commands and configuration
+- [SQLMesh Package README](packages/sqlmesh/README.md) -- SQLMesh-specific commands and configuration

@@ -152,9 +152,9 @@ SQLMesh's plan command shows exactly what changed and categorizes the impact. No
 
 ### In this project
 
-**dbt** (`packages/dbt-waci/tests/`): 11 singular SQL tests covering null checks, uniqueness, valid values, and WACI bounds.
+**dbt** (`packages/dbt/tests/`): 11 singular SQL tests covering null checks, uniqueness, valid values, and WACI bounds.
 
-**SQLMesh** (`packages/sqlmesh-waci/audits/`): 11 equivalent audits attached directly to models via `MODEL(audits (...))` declarations.
+**SQLMesh** (`packages/sqlmesh/audits/`): 11 equivalent audits attached directly to models via `MODEL(audits (...))` declarations.
 
 ---
 
@@ -202,7 +202,7 @@ Both tools can target Spark clusters. dbt's `dbt-spark` adapter is more battle-t
 
 Both tools treat DuckDB as a first-class citizen for local development and testing. This monorepo uses DuckDB for both implementations, making it easy to run the full WACI pipeline on a laptop with no external infrastructure.
 
-**This project uses DuckDB** -- see the [dbt config](packages/dbt-waci/profiles.yml) and [SQLMesh config](packages/sqlmesh-waci/config.yaml).
+**This project uses DuckDB** -- see the [dbt config](packages/dbt/profiles.yml) and [SQLMesh config](packages/sqlmesh/config.yaml).
 
 ---
 
