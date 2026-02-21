@@ -28,4 +28,4 @@ mcp *ARGS='--db data/dev/output/dbt-warehouse.duckdb':
 
 # test-mcp: run MCP integration tests
 test-mcp *ARGS:
-    uv run pytest {{ARGS}}
+    uv run pytest packages/mcp/tests {{ARGS}}
