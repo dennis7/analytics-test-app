@@ -1,16 +1,17 @@
-"""MCP server for conversational exploration of WACI portfolio carbon data.
+"""MCP server for conversational exploration of analytics pipeline data.
 
 Connects to the DuckDB database produced by either the dbt or SQLMesh pipeline
-and exposes tools for querying portfolio holdings, carbon intensity, and WACI scores.
+and exposes tools for querying the data.
 
 Usage:
-    uv run python packages/mcp/server.py                          # dbt dev (default)
-    uv run python packages/mcp/server.py --db packages/sqlmesh/output/dev/dev.duckdb
-    uv run python packages/mcp/server.py --pipeline sqlmesh       # shorthand
-    uv run python packages/mcp/server.py --pipeline dbt --env prd # dbt production
+    just mcp                                           # dbt dev (default)
+    just mcp --db data/dev/output/sqlmesh-warehouse.duckdb  # SQLMesh dev
+    uv run analytics-mcp --db /path/to/any.duckdb      # explicit path
 """
 
 import argparse
+import logging
+import os
 import sys
 from pathlib import Path
 
@@ -18,8 +19,25 @@ import duckdb
 from mcp.server.fastmcp import FastMCP
 
 # ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+
+LOG_DIR = Path.cwd() / "logs"
+LOG_DIR.mkdir(exist_ok=True)
+
+logger = logging.getLogger("analytics-mcp")
+logger.setLevel(logging.INFO)
+
+_handler = logging.FileHandler(LOG_DIR / "mcp.log")
+_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+logger.addHandler(_handler)
+
+# ---------------------------------------------------------------------------
 # CLI args (parsed before FastMCP takes over stdio)
 # ---------------------------------------------------------------------------
+
+DB_NAMES = {"dbt": "dbt-warehouse.duckdb", "sqlmesh": "sqlmesh-warehouse.duckdb"}
+
 
 def _resolve_db_path() -> Path:
     parser = argparse.ArgumentParser(add_help=False)
@@ -31,30 +49,29 @@ def _resolve_db_path() -> Path:
     if args.db:
         return Path(args.db)
 
-    # Resolve relative to this file's location (packages/mcp/) -> repo root
-    repo_root = Path(__file__).resolve().parent.parent.parent
-    if args.pipeline == "dbt":
-        return repo_root / "packages" / "dbt" / "output" / args.env / f"{args.env}.duckdb"
-    else:
-        return repo_root / "packages" / "sqlmesh" / "output" / args.env / f"{args.env}.duckdb"
+    data_dir = Path(os.environ.get("DATA_DIR", Path.cwd() / "data"))
+    return data_dir / args.env / "output" / DB_NAMES[args.pipeline]
 
 
 DB_PATH = _resolve_db_path()
+logger.info("Resolved DB path: %s", DB_PATH)
 
 # ---------------------------------------------------------------------------
 # DuckDB connection helper
 # ---------------------------------------------------------------------------
 
+
 def _get_conn() -> duckdb.DuckDBPyConnection:
-    """Open a read-only connection to the pipeline DuckDB."""
+    """Open a read-only connection to the DuckDB database."""
     return duckdb.connect(str(DB_PATH), read_only=True)
 
 
-def _run_query(sql: str) -> str:
+def _run_query(sql: str, params: list | None = None) -> str:
     """Execute SQL and return results as a formatted markdown table."""
+    logger.info("Query: %s", sql.strip()[:200])
     conn = _get_conn()
     try:
-        result = conn.execute(sql)
+        result = conn.execute(sql, params or [])
         columns = [desc[0] for desc in result.description]
         rows = result.fetchall()
 
@@ -64,10 +81,7 @@ def _run_query(sql: str) -> str:
         # Build markdown table
         header = "| " + " | ".join(columns) + " |"
         separator = "| " + " | ".join("---" for _ in columns) + " |"
-        body = "\n".join(
-            "| " + " | ".join(_fmt(v) for v in row) + " |"
-            for row in rows
-        )
+        body = "\n".join("| " + " | ".join(_fmt(v) for v in row) + " |" for row in rows)
         return f"{header}\n{separator}\n{body}"
     finally:
         conn.close()
@@ -86,17 +100,42 @@ def _fmt(value) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Schema prefix detection (dbt uses main_marts, sqlmesh uses marts)
+# ---------------------------------------------------------------------------
+
+
+def _detect_schema_prefixes() -> dict[str, str]:
+    """Detect schema naming convention once at startup."""
+    conn = _get_conn()
+    try:
+        schemas = {r[0] for r in conn.execute("SELECT DISTINCT table_schema FROM information_schema.tables").fetchall()}
+        return {
+            "staging": "main_staging" if "main_staging" in schemas else "staging",
+            "intermediate": "main_intermediate" if "main_intermediate" in schemas else "intermediate",
+            "marts": "main_marts" if "main_marts" in schemas else "marts",
+        }
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
 # MCP server
 # ---------------------------------------------------------------------------
 
 mcp = FastMCP(
-    "WACI Data Explorer",
+    "Analytics Data Explorer",
     instructions=(
-        "You have access to a DuckDB database containing WACI (Weighted Average Carbon Intensity) "
-        "portfolio data. Use the tools to explore portfolios, holdings, carbon scores, and WACI metrics. "
+        "You have access to a DuckDB database containing analytics pipeline data. "
+        "Use the tools to explore the data. "
         "Start with `list_tables` to see what's available, then use `query` for any SQL question."
     ),
 )
+
+# Internal schemas to exclude from user-facing results
+_EXCLUDED_SCHEMA_FILTER = """
+    table_schema NOT LIKE 'sqlmesh%'
+    AND table_schema NOT IN ('information_schema', 'sqlmesh')
+"""
 
 
 @mcp.resource("schema://tables")
@@ -104,22 +143,24 @@ def schema_overview() -> str:
     """Return a description of all tables and their columns in the database."""
     conn = _get_conn()
     try:
-        tables = conn.execute("""
+        tables = conn.execute(f"""
             SELECT table_schema, table_name, table_type
             FROM information_schema.tables
-            WHERE table_schema NOT LIKE 'sqlmesh%'
-              AND table_schema NOT IN ('information_schema', 'sqlmesh')
+            WHERE {_EXCLUDED_SCHEMA_FILTER}
             ORDER BY table_schema, table_name
         """).fetchall()
 
         parts = []
         for schema, table, ttype in tables:
-            cols = conn.execute(f"""
+            cols = conn.execute(
+                """
                 SELECT column_name, data_type
                 FROM information_schema.columns
-                WHERE table_schema = '{schema}' AND table_name = '{table}'
+                WHERE table_schema = $1 AND table_name = $2
                 ORDER BY ordinal_position
-            """).fetchall()
+                """,
+                [schema, table],
+            ).fetchall()
             col_list = ", ".join(f"{c[0]} ({c[1]})" for c in cols)
             parts.append(f"- **{schema}.{table}** [{ttype}]: {col_list}")
 
@@ -137,11 +178,10 @@ def list_tables() -> str:
     """
     conn = _get_conn()
     try:
-        tables = conn.execute("""
+        tables = conn.execute(f"""
             SELECT table_schema, table_name, table_type
             FROM information_schema.tables
-            WHERE table_schema NOT LIKE 'sqlmesh%'
-              AND table_schema NOT IN ('information_schema', 'sqlmesh')
+            WHERE {_EXCLUDED_SCHEMA_FILTER}
             ORDER BY table_schema, table_name
         """).fetchall()
 
@@ -166,7 +206,7 @@ def describe_table(table_name: str) -> str:
     """Show the columns, types, and sample values for a table.
 
     Args:
-        table_name: Fully qualified name like 'main_marts.fct_portfolio_waci'
+        table_name: Fully qualified name like 'marts.fct_portfolio_waci'
                     or just 'fct_portfolio_waci' (will search all schemas).
     """
     conn = _get_conn()
@@ -175,24 +215,29 @@ def describe_table(table_name: str) -> str:
             schema, tbl = table_name.split(".", 1)
         else:
             # Find the table in any schema
-            match = conn.execute(f"""
+            match = conn.execute(
+                f"""
                 SELECT table_schema, table_name
                 FROM information_schema.tables
-                WHERE table_name = '{table_name}'
-                  AND table_schema NOT LIKE 'sqlmesh%'
-                  AND table_schema NOT IN ('information_schema', 'sqlmesh')
+                WHERE table_name = $1
+                  AND {_EXCLUDED_SCHEMA_FILTER}
                 LIMIT 1
-            """).fetchone()
+                """,
+                [table_name],
+            ).fetchone()
             if not match:
                 return f"Table '{table_name}' not found."
             schema, tbl = match
 
-        cols = conn.execute(f"""
+        cols = conn.execute(
+            """
             SELECT column_name, data_type, is_nullable
             FROM information_schema.columns
-            WHERE table_schema = '{schema}' AND table_name = '{tbl}'
+            WHERE table_schema = $1 AND table_name = $2
             ORDER BY ordinal_position
-        """).fetchall()
+            """,
+            [schema, tbl],
+        ).fetchall()
 
         if not cols:
             return f"Table '{schema}.{tbl}' has no columns (or doesn't exist)."
@@ -219,163 +264,143 @@ def describe_table(table_name: str) -> str:
 def query(sql: str) -> str:
     """Run a read-only SQL query against the DuckDB database and return results.
 
-    The database contains WACI portfolio carbon data with these key tables:
-    - staging layer: stg_portfolio_positions, stg_market_data, stg_carbon_scores
-    - intermediate layer: int_portfolio_exposure, int_portfolio_carbon
-    - marts layer: fct_portfolio_waci
-
-    Schema prefixes vary by pipeline:
-    - dbt: main_staging, main_intermediate, main_marts
-    - SQLMesh: staging, intermediate, marts
-
     Args:
         sql: A SELECT query. DML/DDL statements are not allowed (read-only mode).
     """
     try:
         return _run_query(sql)
     except duckdb.Error as e:
+        logger.error("Query error: %s", e)
         return f"**Query error:** {e}"
 
 
 @mcp.tool()
 def portfolio_summary() -> str:
-    """Get a summary of all portfolios: WACI score, total market value, and number of holdings."""
-    conn = _get_conn()
-    try:
-        # Detect schema prefix (dbt vs sqlmesh)
-        schemas = [r[0] for r in conn.execute(
-            "SELECT DISTINCT table_schema FROM information_schema.tables"
-        ).fetchall()]
-        prefix = "main_marts" if "main_marts" in schemas else "marts"
-
-        return _run_query(f"""
-            SELECT
-                portfolio_id,
-                as_of_date,
-                waci,
-                total_market_value,
-                num_holdings
-            FROM "{prefix}".fct_portfolio_waci
-            ORDER BY portfolio_id, as_of_date
-        """)
-    finally:
-        conn.close()
+    """Get a summary of all portfolios: WACI score, market value, and number of holdings."""
+    prefix = _get_schema_prefix("marts")
+    return _run_query(f"""
+        SELECT
+            portfolio_id,
+            as_of_date,
+            waci,
+            total_market_value,
+            num_holdings
+        FROM "{prefix}".fct_portfolio_waci
+        ORDER BY portfolio_id, as_of_date
+    """)
 
 
 @mcp.tool()
 def holdings_breakdown(portfolio_id: str) -> str:
     """Show all holdings in a portfolio with their carbon impact.
 
-    Returns each security's weight, market value, carbon intensity,
-    and contribution to the portfolio's WACI score.
-
     Args:
         portfolio_id: Portfolio identifier, e.g. 'PF001'.
     """
-    conn = _get_conn()
-    try:
-        schemas = [r[0] for r in conn.execute(
-            "SELECT DISTINCT table_schema FROM information_schema.tables"
-        ).fetchall()]
-        int_prefix = "main_intermediate" if "main_intermediate" in schemas else "intermediate"
-        mart_prefix = "main_marts" if "main_marts" in schemas else "marts"
+    int_prefix = _get_schema_prefix("intermediate")
+    mart_prefix = _get_schema_prefix("marts")
 
-        return _run_query(f"""
-            SELECT
-                c.security_id,
-                c.company_name,
-                c.market_value,
-                ROUND(c.portfolio_weight * 100, 2) AS weight_pct,
-                c.carbon_intensity,
-                c.weighted_carbon_intensity,
-                ROUND(c.weighted_carbon_intensity / w.waci * 100, 1) AS pct_of_waci
-            FROM "{int_prefix}".int_portfolio_carbon c
-            JOIN "{mart_prefix}".fct_portfolio_waci w
-              USING (portfolio_id, as_of_date)
-            WHERE c.portfolio_id = '{portfolio_id}'
-            ORDER BY c.weighted_carbon_intensity DESC
-        """)
-    finally:
-        conn.close()
+    return _run_query(
+        f"""
+        SELECT
+            c.security_id,
+            c.company_name,
+            c.market_value,
+            ROUND(c.portfolio_weight * 100, 2) AS weight_pct,
+            c.carbon_intensity,
+            c.weighted_carbon_intensity,
+            ROUND(c.weighted_carbon_intensity / w.waci * 100, 1) AS pct_of_waci
+        FROM "{int_prefix}".int_portfolio_carbon c
+        JOIN "{mart_prefix}".fct_portfolio_waci w
+          USING (portfolio_id, as_of_date)
+        WHERE c.portfolio_id = $1
+        ORDER BY c.weighted_carbon_intensity DESC
+        """,
+        [portfolio_id],
+    )
 
 
 @mcp.tool()
 def top_carbon_contributors(limit: int = 10) -> str:
     """Rank securities by carbon intensity across all portfolios.
 
-    Shows which companies contribute the most carbon risk.
-
     Args:
         limit: Number of results to return (default 10).
     """
-    conn = _get_conn()
-    try:
-        schemas = [r[0] for r in conn.execute(
-            "SELECT DISTINCT table_schema FROM information_schema.tables"
-        ).fetchall()]
-        prefix = "main_intermediate" if "main_intermediate" in schemas else "intermediate"
-
-        return _run_query(f"""
-            SELECT DISTINCT
-                security_id,
-                company_name,
-                carbon_emissions_tonnes,
-                revenue_usd,
-                carbon_intensity
-            FROM "{prefix}".int_portfolio_carbon
-            ORDER BY carbon_intensity DESC
-            LIMIT {int(limit)}
-        """)
-    finally:
-        conn.close()
+    prefix = _get_schema_prefix("intermediate")
+    return _run_query(
+        f"""
+        SELECT DISTINCT
+            security_id,
+            company_name,
+            carbon_emissions_tonnes,
+            revenue_usd,
+            carbon_intensity
+        FROM "{prefix}".int_portfolio_carbon
+        ORDER BY carbon_intensity DESC
+        LIMIT $1
+        """,
+        [int(limit)],
+    )
 
 
 @mcp.tool()
 def compare_portfolios() -> str:
-    """Compare all portfolios side by side on WACI, market value, and carbon exposure."""
-    conn = _get_conn()
-    try:
-        schemas = [r[0] for r in conn.execute(
-            "SELECT DISTINCT table_schema FROM information_schema.tables"
-        ).fetchall()]
-        int_prefix = "main_intermediate" if "main_intermediate" in schemas else "intermediate"
-        mart_prefix = "main_marts" if "main_marts" in schemas else "marts"
+    """Compare all portfolios side by side on key metrics."""
+    int_prefix = _get_schema_prefix("intermediate")
+    mart_prefix = _get_schema_prefix("marts")
 
-        return _run_query(f"""
-            WITH carbon_stats AS (
-                SELECT
-                    portfolio_id,
-                    as_of_date,
-                    MAX(weighted_carbon_intensity) AS max_holding_wci,
-                    MIN(weighted_carbon_intensity) AS min_holding_wci,
-                    AVG(carbon_intensity) AS avg_carbon_intensity
-                FROM "{int_prefix}".int_portfolio_carbon
-                GROUP BY portfolio_id, as_of_date
-            )
+    return _run_query(f"""
+        WITH carbon_stats AS (
             SELECT
-                w.portfolio_id,
-                w.as_of_date,
-                w.waci,
-                w.total_market_value,
-                w.num_holdings,
-                s.avg_carbon_intensity,
-                s.max_holding_wci,
-                s.min_holding_wci
-            FROM "{mart_prefix}".fct_portfolio_waci w
-            JOIN carbon_stats s USING (portfolio_id, as_of_date)
-            ORDER BY w.waci DESC
-        """)
-    finally:
-        conn.close()
+                portfolio_id,
+                as_of_date,
+                MAX(weighted_carbon_intensity) AS max_holding_wci,
+                MIN(weighted_carbon_intensity) AS min_holding_wci,
+                AVG(carbon_intensity) AS avg_carbon_intensity
+            FROM "{int_prefix}".int_portfolio_carbon
+            GROUP BY portfolio_id, as_of_date
+        )
+        SELECT
+            w.portfolio_id,
+            w.as_of_date,
+            w.waci,
+            w.total_market_value,
+            w.num_holdings,
+            s.avg_carbon_intensity,
+            s.max_holding_wci,
+            s.min_holding_wci
+        FROM "{mart_prefix}".fct_portfolio_waci w
+        JOIN carbon_stats s USING (portfolio_id, as_of_date)
+        ORDER BY w.waci DESC
+    """)
 
 
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
-if __name__ == "__main__":
+# Lazily detected on first access (DB may not exist at import time in tests)
+_schema_prefixes: dict[str, str] = {}
+
+
+def _get_schema_prefix(layer: str) -> str:
+    """Return the schema name for a layer (staging/intermediate/marts), detecting on first call."""
+    global _schema_prefixes
+    if not _schema_prefixes:
+        _schema_prefixes = _detect_schema_prefixes()
+    return _schema_prefixes[layer]
+
+
+def main():
     if not DB_PATH.exists():
+        logger.error("Database not found at %s", DB_PATH)
         print(f"Error: database not found at {DB_PATH}", file=sys.stderr)
-        print("Run the pipeline first: cd packages/dbt && uv run dbt build", file=sys.stderr)
+        print("Run the pipeline first: just dbt build", file=sys.stderr)
         sys.exit(1)
+    logger.info("Starting MCP server with DB: %s", DB_PATH)
     mcp.run(transport="stdio")
+
+
+if __name__ == "__main__":
+    main()

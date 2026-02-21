@@ -1,6 +1,6 @@
 # SQLMesh vs dbt: A Comprehensive Comparison
 
-This document provides a detailed comparison of **dbt** (data build tool) and **SQLMesh** -- two leading SQL-based data transformation frameworks. Both are used in this monorepo to implement the same WACI (Weighted Average Carbon Intensity) pipeline, giving a practical side-by-side view.
+This document provides a detailed comparison of **dbt** (data build tool) and **SQLMesh** -- two leading SQL-based data transformation frameworks. Both are used in this monorepo to implement the same analytics pipeline, giving a practical side-by-side view.
 
 ---
 
@@ -152,7 +152,7 @@ SQLMesh's plan command shows exactly what changed and categorizes the impact. No
 
 ### In this project
 
-**dbt** (`packages/dbt/tests/`): 11 singular SQL tests covering null checks, uniqueness, valid values, and WACI bounds.
+**dbt** (`packages/dbt/tests/`): 11 singular SQL tests covering null checks, uniqueness, valid values, and metric bounds.
 
 **SQLMesh** (`packages/sqlmesh/audits/`): 11 equivalent audits attached directly to models via `MODEL(audits (...))` declarations.
 
@@ -200,7 +200,7 @@ Both tools can target Spark clusters. dbt's `dbt-spark` adapter is more battle-t
 | **MotherDuck** | Supported via `dbt-duckdb` | Supported |
 | **In-memory mode** | Supported | Supported |
 
-Both tools treat DuckDB as a first-class citizen for local development and testing. This monorepo uses DuckDB for both implementations, making it easy to run the full WACI pipeline on a laptop with no external infrastructure.
+Both tools treat DuckDB as a first-class citizen for local development and testing. This monorepo uses DuckDB for both implementations, making it easy to run the full pipeline on a laptop with no external infrastructure.
 
 **This project uses DuckDB** -- see the [dbt config](packages/dbt/profiles.yml) and [SQLMesh config](packages/sqlmesh/config.yaml).
 
@@ -300,7 +300,7 @@ SQLMesh provides a **dbt compatibility mode** that can read dbt projects directl
 2. Run both tools side-by-side during a transition period
 3. Gradually convert models to native SQLMesh syntax for full feature access
 
-This monorepo demonstrates exactly this pattern -- the same WACI pipeline implemented in both frameworks, making it easy to compare approaches and validate parity.
+This monorepo demonstrates exactly this pattern -- the same pipeline implemented in both frameworks, making it easy to compare approaches and validate parity.
 
 ---
 

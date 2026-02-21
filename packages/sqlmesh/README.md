@@ -1,30 +1,22 @@
-# WACI SQLMesh Project
+# Analytics SQLMesh Project
 
-A SQLMesh project for computing **Weighted Average Carbon Intensity (WACI)** for investment portfolios, powered by DuckDB.
+A SQLMesh project for computing portfolio analytics, powered by DuckDB.
 
-> Part of the [WACI Monorepo](../../README.md). See also the [dbt implementation](../dbt/).
+> Part of the [Analytics Monorepo](../../README.md). See also the [dbt implementation](../dbt/).
 
 ## Quick Start
 
 ```bash
-# From the repo root: install all workspace dependencies
+# From the repo root
 uv sync
-
-# Run the pipeline
-cd packages/sqlmesh
-uv run sqlmesh plan --auto-apply
+just seed
+just sqlmesh plan
 ```
 
 ## Project Structure
 
 ```
 packages/sqlmesh/
-├── data/                      # Seed data (parquet) per environment
-│   ├── generate_seed_data.py
-│   ├── dev/
-│   ├── sit/
-│   ├── uat/
-│   └── prd/
 ├── models/
 │   ├── staging/               # 1:1 source mappings with type casting (views)
 │   ├── intermediate/          # Business logic (exposure, carbon calcs) (tables)
@@ -33,18 +25,29 @@ packages/sqlmesh/
 │   ├── staging/
 │   ├── intermediate/
 │   └── marts/
-├── config.yaml                # SQLMesh project configuration
+├── config.py                  # SQLMesh project configuration (Python-based)
 └── pyproject.toml             # Workspace member (sqlmesh-specific deps)
 ```
 
 ## Common Commands
 
 ```bash
-# All commands run from packages/sqlmesh/
+# All commands run from the repo root via just
 
-uv run sqlmesh plan                                     # Validate models and show changes
-uv run sqlmesh plan --auto-apply                        # Apply all changes
-uv run sqlmesh audit                                    # Run audits only
-uv run sqlmesh dag                                      # View the DAG
-uv run sqlmesh render staging.stg_portfolio_positions   # Render a model's SQL
+just sqlmesh plan                                     # Validate models and show changes
+just sqlmesh plan --auto-apply                        # Apply all changes
+just sqlmesh audit                                    # Run audits only
+just sqlmesh dag                                      # View the DAG
+just sqlmesh render staging.stg_portfolio_positions   # Render a model's SQL
 ```
+
+## MCP Server
+
+The monorepo includes an [MCP server](../mcp/server.py) for conversational exploration of the pipeline output. After running the SQLMesh pipeline:
+
+```bash
+# SQLMesh dev database
+just mcp --db data/dev/output/sqlmesh-warehouse.duckdb
+```
+
+Available tools: `list_tables`, `describe_table`, `query`, `portfolio_summary`, `holdings_breakdown`, `top_carbon_contributors`, `compare_portfolios`. See the [root README](../../README.md#mcp-server) for full details.

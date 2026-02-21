@@ -1,11 +1,17 @@
-"""Generate sample parquet files per environment for the WACI dbt project."""
+"""Generate sample parquet files per environment for the analytics pipeline."""
 
+import os
+import sys
 from pathlib import Path
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-ROOT_DIR = Path(__file__).resolve().parent
+DATA_DIR = Path(os.environ.get("DATA_DIR", ""))
+if not DATA_DIR.name:
+    print("Error: DATA_DIR environment variable is not set.", file=sys.stderr)
+    print("Run via: just seed", file=sys.stderr)
+    sys.exit(1)
 
 
 ENVIRONMENTS = {
@@ -318,8 +324,9 @@ ENVIRONMENTS = {
 
 def write_env_data(env: str, config: dict) -> None:
     """Write all parquet files for a single environment."""
-    env_dir = ROOT_DIR / env
+    env_dir = DATA_DIR / env / "input"
     env_dir.mkdir(parents=True, exist_ok=True)
+    (DATA_DIR / env / "output").mkdir(parents=True, exist_ok=True)
 
     as_of_date = config["as_of_date"]
     pos = config["positions"]
@@ -354,4 +361,4 @@ if __name__ == "__main__":
         n_securities = len(config["market_data"]["security_id"])
         print(f"  {env}: {n_positions} positions, {n_securities} securities")
 
-    print(f"\nSeed data written to {ROOT_DIR}/")
+    print(f"\nSeed data written to {DATA_DIR}/")

@@ -17,9 +17,8 @@ logs/
 # SQLMesh
 .cache/
 
-# Shared
-**/output/**/*.duckdb
-**/output/**/*.duckdb.wal
+# Pipeline data (regenerate with: just seed)
+data/
 
 # Local config
 .user.yml

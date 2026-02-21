@@ -1,6 +1,6 @@
-# WACI Data Pipeline Monorepo
+# Analytics Data Pipeline Monorepo
 
-A monorepo containing **two parallel implementations** of a Weighted Average Carbon Intensity (WACI) data pipeline -- one in [dbt](https://www.getdbt.com/) and one in [SQLMesh](https://sqlmesh.com/). Both produce identical outputs from the same source data, making this an ideal environment for comparing the two frameworks side by side.
+A monorepo containing **two parallel implementations** of an analytics data pipeline -- one in [dbt](https://www.getdbt.com/) and one in [SQLMesh](https://sqlmesh.com/). Both produce identical outputs from the same source data, making this an ideal environment for comparing the two frameworks side by side.
 
 ## Repository Structure
 
@@ -11,7 +11,6 @@ A monorepo containing **two parallel implementations** of a Weighted Average Car
 │   │   ├── models/                #   staging / intermediate / marts
 │   │   ├── tests/                 #   data quality tests
 │   │   ├── macros/                #   reusable SQL macros
-│   │   ├── data/                  #   seed parquet files (dev/sit/uat/prd)
 │   │   ├── dbt_project.yml
 │   │   ├── profiles.yml
 │   │   └── packages.yml
@@ -19,12 +18,21 @@ A monorepo containing **two parallel implementations** of a Weighted Average Car
 │   ├── sqlmesh/                   # SQLMesh implementation
 │   │   ├── models/                #   staging / intermediate / marts
 │   │   ├── audits/                #   data quality audits
-│   │   ├── data/                  #   seed parquet files (dev/sit/uat/prd)
-│   │   └── config.yaml
+│   │   └── config.py
 │   │
 │   └── mcp/                       # MCP server for conversational data access
-│       └── server.py              #   FastMCP server (stdio transport)
+│       ├── server.py              #   FastMCP server (stdio transport)
+│       └── tests/                 #   integration tests
 │
+├── scripts/
+│   └── generate_seed_data.py      # Seed data generator (all environments)
+│
+├── data/                          # Generated data (gitignored)
+│   └── {env}/
+│       ├── input/                 #   parquet seed files
+│       └── output/                #   DuckDB warehouse files
+│
+├── justfile                       # Task runner (just seed, just dbt build, etc.)
 ├── pyproject.toml                 # Workspace root (shared deps, single venv)
 ├── uv.lock                        # Single lockfile for all packages
 ├── SQLMESH_VS_DBT.md              # Detailed comparison: SQLMesh vs dbt
@@ -35,6 +43,7 @@ A monorepo containing **two parallel implementations** of a Weighted Average Car
 
 - [Python 3.12+](https://www.python.org/downloads/)
 - [uv](https://docs.astral.sh/uv/getting-started/installation/)
+- [just](https://just.systems/man/en/installation.html)
 
 ## Quick Start
 
@@ -43,13 +52,19 @@ A monorepo containing **two parallel implementations** of a Weighted Average Car
 uv sync
 
 # Install dbt packages (dbt_utils)
-cd packages/dbt && uv run dbt deps && cd ../..
+just dbt deps
+
+# Generate seed data for all environments
+just seed
 
 # Run dbt pipeline
-cd packages/dbt && uv run dbt build && cd ../..
+just dbt build
 
 # Run SQLMesh pipeline
-cd packages/sqlmesh && uv run sqlmesh plan --auto-apply && cd ../..
+just sqlmesh plan
+
+# Run MCP integration tests
+just test-mcp
 ```
 
 ## How the Monorepo Works
@@ -65,7 +80,7 @@ The root `pyproject.toml` defines a `[tool.uv.workspace]` with `members = ["pack
 3. Installs workspace members as editable packages
 
 This means:
-- `uv run dbt build` and `uv run sqlmesh plan` both work from the same venv
+- `just dbt build` and `just sqlmesh plan` both work from the same venv
 - No duplicate installs of shared dependencies like `pyarrow`
 - Dependency versions are guaranteed consistent across both packages
 
@@ -79,21 +94,23 @@ Each package under `packages/` has its own `pyproject.toml` declaring only its s
 | `packages/sqlmesh/` | `sqlmesh[duckdb]>=0.142` |
 | `packages/mcp/` | `mcp>=1.0`, `duckdb>=1.0` |
 
-The root `pyproject.toml` aggregates everything and adds shared dev dependencies (ruff). Shared tool config (ruff rules, Python version) lives at the root.
+The root `pyproject.toml` aggregates everything and adds shared dev dependencies (ruff, pytest). Shared tool config (ruff rules, Python version) lives at the root.
 
-### Running commands
+### Task runner
 
-Both tools are available from the root venv. Run them from their respective package directory so they find their config files:
+All commands are run from the repo root via [just](https://just.systems/):
 
 ```bash
-# dbt (needs to be in packages/dbt/ for dbt_project.yml)
-cd packages/dbt && uv run dbt build
-
-# SQLMesh (needs to be in packages/sqlmesh/ for config.yaml)
-cd packages/sqlmesh && uv run sqlmesh plan --auto-apply
+just seed              # Generate seed data
+just lint              # Run ruff linter and formatter
+just dbt build         # Run dbt pipeline
+just dbt test          # Run dbt tests only
+just sqlmesh plan      # Run SQLMesh pipeline
+just mcp               # Start MCP server (dbt dev output)
+just test-mcp          # Run MCP integration tests
 ```
 
-## The WACI Pipeline
+## The Pipeline
 
 Both implementations compute the same thing:
 
@@ -135,10 +152,10 @@ Both implementations support four environments with progressively larger dataset
 
 ```bash
 # dbt
-cd packages/dbt && uv run dbt build --target sit
+just dbt build --target sit
 
-# SQLMesh (default: dev, configured in config.yaml)
-cd packages/sqlmesh && uv run sqlmesh plan --auto-apply
+# SQLMesh (default: dev, configured in config.py)
+just sqlmesh plan
 ```
 
 ## Data Quality
@@ -155,7 +172,7 @@ Both implementations include 11 data quality checks covering:
 
 ## MCP Server
 
-The `packages/mcp/` package provides an [MCP](https://modelcontextprotocol.io/) server for conversational exploration of the pipeline data. It connects to the DuckDB output and exposes tools an LLM can call to query portfolios, holdings, carbon scores, and WACI metrics.
+The `packages/mcp/` package provides an [MCP](https://modelcontextprotocol.io/) server for conversational exploration of the pipeline data. It connects to the DuckDB output and exposes tools an LLM can call to query the data.
 
 ### Available tools
 
@@ -176,9 +193,9 @@ Add to your `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "waci": {
+    "analytics": {
       "command": "uv",
-      "args": ["run", "python", "packages/mcp/server.py"],
+      "args": ["run", "analytics-mcp", "--db", "data/dev/output/dbt-warehouse.duckdb"],
       "cwd": "/path/to/this/repo"
     }
   }
@@ -189,34 +206,29 @@ Add to your `claude_desktop_config.json`:
 
 ```bash
 # Default: dbt dev database
-uv run python packages/mcp/server.py
+just mcp
 
 # SQLMesh database
-uv run python packages/mcp/server.py --pipeline sqlmesh
-
-# Specific environment
-uv run python packages/mcp/server.py --pipeline dbt --env prd
+just mcp --db data/dev/output/sqlmesh-warehouse.duckdb
 
 # Explicit path
-uv run python packages/mcp/server.py --db /path/to/any.duckdb
+just mcp --db /path/to/any.duckdb
 ```
 
 ## Regenerating Seed Data
 
-Both packages include a `data/generate_seed_data.py` script:
+Seed data lives in `scripts/generate_seed_data.py` and writes to `data/{env}/input/`:
 
 ```bash
-uv run python packages/dbt/data/generate_seed_data.py
-uv run python packages/sqlmesh/data/generate_seed_data.py
+just seed
 ```
 
 ## Linting
 
-Ruff config lives in the root `pyproject.toml` and applies to both packages:
+Ruff config lives in the root `pyproject.toml` and applies to all packages:
 
 ```bash
-uv run ruff check .
-uv run ruff format --check .
+just lint
 ```
 
 ## Further Reading
@@ -224,4 +236,3 @@ uv run ruff format --check .
 - [SQLMesh vs dbt: Detailed Comparison](SQLMESH_VS_DBT.md) -- pros, cons, tradeoffs, integrations with Databricks, Spark, DuckDB, Delta Lake, and Iceberg
 - [dbt Package README](packages/dbt/README.md) -- dbt-specific commands and configuration
 - [SQLMesh Package README](packages/sqlmesh/README.md) -- SQLMesh-specific commands and configuration
-- [MCP Server](packages/mcp/server.py) -- conversational data exploration via MCP

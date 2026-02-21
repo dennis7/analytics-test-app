@@ -8,8 +8,6 @@ MODEL (
     description 'Staged carbon scores with derived carbon intensity'
 );
 
-@DEF(data_path, 'data/dev');
-
 SELECT
     security_id::VARCHAR AS security_id,
     company_name::VARCHAR AS company_name,

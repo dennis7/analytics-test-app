@@ -9,8 +9,6 @@ MODEL (
     description 'Staged market prices with typed columns'
 );
 
-@DEF(data_path, 'data/dev');
-
 SELECT
     security_id::VARCHAR AS security_id,
     price::DOUBLE AS price,

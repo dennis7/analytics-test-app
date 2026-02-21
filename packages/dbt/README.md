@@ -1,31 +1,23 @@
-# WACI dbt Project
+# Analytics dbt Project
 
-A dbt project for computing **Weighted Average Carbon Intensity (WACI)** for investment portfolios, powered by DuckDB.
+A dbt project for computing portfolio analytics, powered by DuckDB.
 
-> Part of the [WACI Monorepo](../../README.md). See also the [SQLMesh implementation](../sqlmesh/).
+> Part of the [Analytics Monorepo](../../README.md). See also the [SQLMesh implementation](../sqlmesh/).
 
 ## Quick Start
 
 ```bash
-# From the repo root: install all workspace dependencies
+# From the repo root
 uv sync
-
-# Install dbt packages, then run the pipeline
-cd packages/dbt
-uv run dbt deps
-uv run dbt build
+just dbt deps
+just seed
+just dbt build
 ```
 
 ## Project Structure
 
 ```
 packages/dbt/
-├── data/                      # Seed data (parquet) per environment
-│   ├── generate_seed_data.py
-│   ├── dev/
-│   ├── sit/
-│   ├── uat/
-│   └── prd/
 ├── models/
 │   ├── sources.yml            # Source definitions (upstream parquet files)
 │   ├── staging/               # 1:1 source mappings with type casting
@@ -42,23 +34,37 @@ packages/dbt/
 ## Common Commands
 
 ```bash
-# All commands run from packages/dbt/
+# All commands run from the repo root via just
 
-uv run dbt debug                  # Verify configuration and connection
-uv run dbt build                  # Build everything (models + tests)
-uv run dbt run                    # Run models only
-uv run dbt test                   # Run tests only
-uv run dbt build --target sit     # Target a specific environment
-uv run dbt build --target prd
+just dbt debug                  # Verify configuration and connection
+just dbt build                  # Build everything (models + tests)
+just dbt run                    # Run models only
+just dbt test                   # Run tests only
+just dbt build --target sit     # Target a specific environment
+just dbt build --target prd
 ```
 
 ## Environments
 
-| Target | DuckDB Path                | Threads |
-|--------|----------------------------|---------|
-| `dev`  | `output/dev/dev.duckdb`    | 4       |
-| `sit`  | `output/sit/sit.duckdb`    | 4       |
-| `uat`  | `output/uat/uat.duckdb`    | 4       |
-| `prd`  | `output/prd/prd.duckdb`    | 8       |
+| Target | DuckDB Path                                  | Threads |
+|--------|----------------------------------------------|---------|
+| `dev`  | `data/dev/output/dbt-warehouse.duckdb`       | 4       |
+| `sit`  | `data/sit/output/dbt-warehouse.duckdb`       | 4       |
+| `uat`  | `data/uat/output/dbt-warehouse.duckdb`       | 4       |
+| `prd`  | `data/prd/output/dbt-warehouse.duckdb`       | 8       |
 
-Override the database path with `DBT_DUCKDB_PATH` env var.
+All paths are resolved via the `DATA_DIR` environment variable, set automatically by the justfile.
+
+## MCP Server
+
+The monorepo includes an [MCP server](../mcp/server.py) for conversational exploration of the pipeline output. After running the dbt pipeline:
+
+```bash
+# dbt dev database (default)
+just mcp
+
+# Specific environment
+just mcp --db data/prd/output/dbt-warehouse.duckdb
+```
+
+Available tools: `list_tables`, `describe_table`, `query`, `portfolio_summary`, `holdings_breakdown`, `top_carbon_contributors`, `compare_portfolios`. See the [root README](../../README.md#mcp-server) for full details.

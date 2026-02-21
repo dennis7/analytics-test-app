@@ -5,8 +5,6 @@ MODEL (
     description 'Staged portfolio positions with typed columns'
 );
 
-@DEF(data_path, 'data/dev');
-
 SELECT
     portfolio_id::VARCHAR AS portfolio_id,
     security_id::VARCHAR AS security_id,
