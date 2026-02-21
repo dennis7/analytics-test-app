@@ -3,7 +3,4 @@ name = "analytics-sqlmesh"
 version = "0.1.0"
 description = "SQLMesh implementation of the analytics pipeline"
 requires-python = ">=3.12"
-dependencies = [
-    "sqlmesh[duckdb]>=0.142",
-    "pyarrow>=19.0",
-]
+dependencies = []

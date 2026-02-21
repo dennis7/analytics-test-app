@@ -32,16 +32,6 @@ wheels = [
 name = "analytics-dbt"
 version = "0.1.0"
 source = { virtual = "packages/dbt" }
-dependencies = [
-    { name = "dbt-duckdb" },
-    { name = "pyarrow" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "dbt-duckdb", specifier = ">=1.10" },
-    { name = "pyarrow", specifier = ">=19.0" },
-]
 
 [[package]]
 name = "analytics-mcp"
@@ -62,16 +52,6 @@ requires-dist = [
 name = "analytics-sqlmesh"
 version = "0.1.0"
 source = { virtual = "packages/sqlmesh" }
-dependencies = [
-    { name = "pyarrow" },
-    { name = "sqlmesh" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "pyarrow", specifier = ">=19.0" },
-    { name = "sqlmesh", extras = ["duckdb"], specifier = ">=0.142" },
-]
 
 [[package]]
 name = "analytics-workspace"
