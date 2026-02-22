@@ -15,6 +15,7 @@ just lint              # Ruff check + format
 just dbt build         # Run full dbt pipeline
 just dbt test          # Run dbt tests only
 just sqlmesh plan      # Run SQLMesh pipeline
+just sqlmesh audit     # Run SQLMesh audits only
 just test-mcp          # Run MCP integration tests (pytest)
 just mcp               # Start MCP server
 ```

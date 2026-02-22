@@ -106,6 +106,7 @@ just lint              # Run ruff linter and formatter
 just dbt build         # Run dbt pipeline
 just dbt test          # Run dbt tests only
 just sqlmesh plan      # Run SQLMesh pipeline
+just sqlmesh audit     # Run SQLMesh audits only
 just mcp               # Start MCP server (both DuckDB databases)
 just test-mcp          # Run MCP integration tests
 ```
