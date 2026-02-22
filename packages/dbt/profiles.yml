@@ -1,23 +1,11 @@
 test_app:
   target: dev
-
   outputs:
     dev:
       type: duckdb
       path: "{{ env_var('DATA_DIR') }}/dev/output/dbt-warehouse.duckdb"
       threads: 4
-
-    sit:
+    test:
       type: duckdb
-      path: "{{ env_var('DATA_DIR') }}/sit/output/dbt-warehouse.duckdb"
+      path: "{{ env_var('DATA_DIR') }}/test/output/dbt-warehouse.duckdb"
       threads: 4
-
-    uat:
-      type: duckdb
-      path: "{{ env_var('DATA_DIR') }}/uat/output/dbt-warehouse.duckdb"
-      threads: 4
-
-    prd:
-      type: duckdb
-      path: "{{ env_var('DATA_DIR') }}/prd/output/dbt-warehouse.duckdb"
-      threads: 8

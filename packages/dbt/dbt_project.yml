@@ -12,15 +12,17 @@ clean-targets:
   - "target"
   - "dbt_packages"
 
+vars:
+  reporting_date: ""
 
 models:
   test_app:
     staging:
       +materialized: view
       +schema: staging
-    intermediate:
+    waci:
       +materialized: table
-      +schema: intermediate
-    marts:
+      +schema: waci
+    wagr:
       +materialized: table
-      +schema: marts
+      +schema: wagr

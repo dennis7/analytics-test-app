@@ -1,6 +1,6 @@
 [project]
 name = "analytics-sqlmesh"
 version = "0.1.0"
-description = "SQLMesh implementation of the analytics pipeline"
+description = "SQLMesh implementation - carbon and green revenue metrics pipeline"
 requires-python = ">=3.12"
 dependencies = []

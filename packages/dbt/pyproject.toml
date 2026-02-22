@@ -1,6 +1,6 @@
 [project]
 name = "analytics-dbt"
 version = "0.1.0"
-description = "dbt implementation of the analytics pipeline"
+description = "dbt implementation - carbon and green revenue metrics pipeline"
 requires-python = ">=3.12"
 dependencies = []

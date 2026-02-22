@@ -4,40 +4,82 @@ sources:
   - name: upstream
     description: "Upstream data sources in parquet format"
     tables:
-      - name: portfolio_positions
-        description: "Portfolio holdings with quantities per security"
+      - name: public_positions
+        description: "Public market portfolio holdings"
         columns:
           - name: portfolio_id
-            description: "Unique portfolio identifier"
-          - name: security_id
-            description: "Unique security identifier"
+          - name: isin
           - name: quantity
-            description: "Number of shares/units held"
           - name: as_of_date
-            description: "Date of the position snapshot"
 
-      - name: market_data
-        description: "Market prices for securities"
+      - name: private_positions
+        description: "Private market portfolio holdings"
         columns:
-          - name: security_id
-            description: "Unique security identifier"
+          - name: portfolio_id
+          - name: fund_id
+          - name: units_held
+          - name: as_of_date
+
+      - name: public_market_data
+        description: "Public market prices"
+        columns:
+          - name: isin
           - name: price
-            description: "Market price per share/unit"
           - name: currency
-            description: "Price currency (ISO 4217)"
           - name: as_of_date
-            description: "Date of the price observation"
 
-      - name: carbon_scores
-        description: "Alternate data - carbon emissions and revenue for carbon intensity calculation"
+      - name: private_valuations
+        description: "Private market NAV valuations"
         columns:
-          - name: security_id
-            description: "Unique security identifier"
-          - name: company_name
-            description: "Company name"
-          - name: carbon_emissions_tonnes
-            description: "Total carbon emissions in metric tonnes"
-          - name: revenue_usd
-            description: "Total revenue in USD"
+          - name: fund_id
+          - name: nav_per_unit
+          - name: valuation_method
           - name: as_of_date
-            description: "Date of the carbon data observation"
+
+      - name: security_master
+        description: "Security identifier mapping and classification"
+        columns:
+          - name: internal_id
+          - name: isin
+          - name: fund_id
+          - name: security_type
+          - name: sector
+          - name: entity_id
+
+      - name: entity_carbon
+        description: "Company-level carbon emissions data"
+        columns:
+          - name: entity_id
+          - name: entity_name
+          - name: carbon_emissions_tonnes
+          - name: revenue_usd
+          - name: as_of_date
+
+      - name: entity_hierarchy
+        description: "Subsidiary to parent entity mapping"
+        columns:
+          - name: child_entity_id
+          - name: parent_entity_id
+
+      - name: sector_carbon
+        description: "Sector average carbon intensities (fallback)"
+        columns:
+          - name: sector
+          - name: avg_carbon_intensity
+          - name: as_of_date
+
+      - name: entity_green_revenue
+        description: "Company-level green revenue data"
+        columns:
+          - name: entity_id
+          - name: entity_name
+          - name: green_revenue_usd
+          - name: total_revenue_usd
+          - name: as_of_date
+
+      - name: sector_green_revenue
+        description: "Sector average green revenue shares (fallback)"
+        columns:
+          - name: sector
+          - name: avg_green_revenue_share
+          - name: as_of_date

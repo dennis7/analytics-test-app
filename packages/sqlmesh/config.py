@@ -17,5 +17,6 @@ config = Config(
     model_defaults=ModelDefaultsConfig(dialect="duckdb", start="2025-12-31"),
     variables={
         "data_path": str(DATA_DIR / "dev" / "input"),
+        "reporting_date": os.environ.get("REPORTING_DATE", ""),
     },
 )

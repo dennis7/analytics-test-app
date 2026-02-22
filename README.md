@@ -1,6 +1,10 @@
 # Analytics Data Pipeline Monorepo
 
-A monorepo containing **two parallel implementations** of an analytics data pipeline -- one in [dbt](https://www.getdbt.com/) and one in [SQLMesh](https://sqlmesh.com/). Both produce identical outputs from the same source data, making this an ideal environment for comparing the two frameworks side by side.
+A monorepo containing **two parallel implementations** of an ESG analytics pipeline -- one in [dbt](https://www.getdbt.com/) and one in [SQLMesh](https://sqlmesh.com/). Both produce identical outputs from the same source data, making this an ideal environment for comparing the two frameworks side by side.
+
+The pipeline computes two standard ESG metrics:
+- **WACI** (Weighted Average Carbon Intensity) -- carbon intensity of an investment portfolio, weighted by each holding's share of total portfolio value
+- **WAGR** (Weighted Average Green Revenue) -- green revenue share of an investment portfolio, weighted by each holding's share of total portfolio value
 
 ## Repository Structure
 
@@ -8,35 +12,42 @@ A monorepo containing **two parallel implementations** of an analytics data pipe
 .
 ├── packages/
 │   ├── dbt/                       # dbt implementation
-│   │   ├── models/                #   staging / intermediate / marts
-│   │   ├── tests/                 #   data quality tests
-│   │   ├── macros/                #   reusable SQL macros
+│   │   ├── models/
+│   │   │   ├── staging/           #   10 staging models (type casting, cleaning)
+│   │   │   ├── waci/              #   7 WACI models (preprocess → harmonize → waterfall → metrics)
+│   │   │   └── wagr/              #   7 WAGR models (same structure as WACI)
+│   │   ├── tests/                 #   32 data quality tests
+│   │   ├── macros/                #   read_parquet, generate_schema_name
 │   │   ├── dbt_project.yml
 │   │   ├── profiles.yml
 │   │   └── packages.yml
 │   │
 │   ├── sqlmesh/                   # SQLMesh implementation
-│   │   ├── models/                #   staging / intermediate / marts
-│   │   ├── audits/                #   data quality audits
+│   │   ├── models/
+│   │   │   ├── staging/           #   10 staging models
+│   │   │   ├── waci/              #   7 WACI models
+│   │   │   └── wagr/              #   7 WAGR models
+│   │   ├── audits/                #   35 data quality audits
+│   │   ├── macros/                #   shared SQL logic via Python @macro()
 │   │   └── config.py
 │   │
-│   └── mcp/                       # MCP server for conversational data access
+│   └── mcp/                       # MCP server for DuckDB exploration
 │       ├── server.py              #   FastMCP server (stdio transport)
 │       └── tests/                 #   integration tests
 │
 ├── scripts/
-│   └── generate_seed_data.py      # Seed data generator (all environments)
+│   └── generate_seed_data.py      # Seed data generator (dev + test environments)
 │
 ├── data/                          # Generated data (gitignored)
 │   └── {env}/
-│       ├── input/                 #   parquet seed files
+│       ├── input/                 #   10 parquet seed files
 │       └── output/                #   DuckDB warehouse files
 │
-├── justfile                       # Task runner (just seed, just dbt build, etc.)
+├── justfile                       # Task runner
 ├── pyproject.toml                 # Workspace root (shared deps, single venv)
 ├── uv.lock                        # Single lockfile for all packages
 ├── SQLMESH_VS_DBT.md              # Detailed comparison: SQLMesh vs dbt
-└── README.md                      # This file
+└── README.md
 ```
 
 ## Prerequisites
@@ -66,32 +77,23 @@ just test-mcp
 
 ## How the Monorepo Works
 
-This project uses a **[uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/)** -- a single Python environment that serves both the dbt and SQLMesh packages.
+This project uses a **[uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/)** -- a single Python environment that serves all three packages.
 
 ### One venv, one lockfile
 
 The root `pyproject.toml` defines a `[tool.uv.workspace]` with `members = ["packages/*"]`. Running `uv sync` from the repo root:
 
-1. Resolves **all** dependencies (dbt + SQLMesh + shared) into a single `uv.lock`
+1. Resolves **all** dependencies (dbt + SQLMesh + MCP + shared) into a single `uv.lock`
 2. Creates **one** `.venv` at the repo root
 3. Installs workspace members as editable packages
 
-This means:
-- `just dbt build` and `just sqlmesh plan` both work from the same venv
-- No duplicate installs of shared dependencies like `pyarrow`
-- Dependency versions are guaranteed consistent across both packages
-
 ### Workspace members
-
-Each package under `packages/` has its own `pyproject.toml` declaring only its specific dependencies:
 
 | Package | Key dependency |
 |---------|---------------|
 | `packages/dbt/` | `dbt-duckdb>=1.10` |
 | `packages/sqlmesh/` | `sqlmesh[duckdb]>=0.142` |
 | `packages/mcp/` | `mcp>=1.0`, `duckdb>=1.0` |
-
-The root `pyproject.toml` aggregates everything and adds shared dev dependencies (ruff, pytest). Shared tool config (ruff rules, Python version) lives at the root.
 
 ### Task runner
 
@@ -104,85 +106,91 @@ just lint              # Run ruff linter and formatter
 just dbt build         # Run dbt pipeline
 just dbt test          # Run dbt tests only
 just sqlmesh plan      # Run SQLMesh pipeline
-just mcp               # Start MCP server (dbt dev output)
+just mcp               # Start MCP server (both DuckDB databases)
 just test-mcp          # Run MCP integration tests
 ```
 
 ## The Pipeline
 
-Both implementations compute the same thing:
+Both implementations follow the same per-metric schema design with four layers:
 
 ```
-Sources (parquet files)
-  ├── portfolio_positions    # holdings per portfolio
-  ├── market_data            # security prices
-  └── carbon_scores          # emissions data per company
+Sources (10 parquet files)
+  ├── security_master         # Security reference data with entity mapping
+  ├── entity_hierarchy        # Parent-child entity relationships
+  ├── public_positions        # Public market holdings per portfolio
+  ├── private_positions       # Private fund holdings per portfolio
+  ├── public_market_data      # Security prices
+  ├── private_valuations      # Fund NAVs
+  ├── entity_carbon           # Entity-level carbon emissions
+  ├── sector_carbon           # Sector average carbon intensities
+  ├── entity_green_revenue    # Entity-level green revenue
+  └── sector_green_revenue    # Sector average green revenue shares
         ↓
-Staging (type casting, cleaning)
-  ├── stg_portfolio_positions
-  ├── stg_market_data
-  └── stg_carbon_scores
+Staging (type casting, cleaning, optional date filtering)
+  └── 10 stg_* views
         ↓
-Intermediate (business logic)
-  ├── int_portfolio_exposure   # market_value = quantity * price
-  │                            # portfolio_weight = market_value / total
-  └── int_portfolio_carbon     # weighted_carbon_intensity = weight * intensity
-        ↓
-Marts (final output)
-  └── fct_portfolio_waci       # WACI = SUM(weighted_carbon_intensity)
-                               # per portfolio, per date
+Per-Metric Pipeline (WACI and WAGR each follow this pattern):
+  ├── Preprocess              # Join positions with market data + security master
+  │   ├── {metric}_prep_public_securities
+  │   └── {metric}_prep_private_securities
+  ├── Harmonize               # Compute market values and portfolio weights
+  │   ├── {metric}_harm_valued_positions
+  │   └── {metric}_harm_portfolio_weights
+  ├── Waterfall               # Apply metric-specific calculations
+  │   ├── {metric}_wf_*       # (carbon intensity / green revenue lookup)
+  │   └── {metric}_wf_*       # (weighted metric per position)
+  └── Metrics                 # Final aggregation
+      └── {metric}_met_portfolio_{metric}   # Per portfolio, per date
 ```
-
-**WACI** (Weighted Average Carbon Intensity) is a standard ESG metric defined by TCFD. It measures the carbon intensity of an investment portfolio, weighted by each holding's share of the total portfolio value.
 
 ## Environments
 
-Both implementations support four environments with progressively larger datasets:
+Both implementations support two environments:
 
-| Environment | Portfolios | Securities | Use Case |
-|-------------|-----------|------------|----------|
-| `dev`       | 2         | 7          | Local development |
-| `sit`       | 2         | 7          | System integration testing |
-| `uat`       | 3         | 9          | User acceptance testing |
-| `prd`       | 4         | 11         | Production |
+| Environment | Portfolios | Securities | Dates | Use Case |
+|-------------|-----------|------------|-------|----------|
+| `dev`       | 2         | 7 public + 3 private | 2 month-ends | Local development |
+| `test`      | 2         | 7 public + 3 private | 2 month-ends | Automated testing |
 
-### Targeting environments
+### Single-date filtering
+
+Both pipelines support running for a single reporting date:
 
 ```bash
-# dbt
-just dbt build --target sit
+# dbt -- pass reporting_date var
+just dbt build --vars "'{\"reporting_date\": \"2025-12-31\"}'"
 
-# SQLMesh (default: dev, configured in config.py)
-just sqlmesh plan
+# SQLMesh -- set REPORTING_DATE env var
+REPORTING_DATE=2025-12-31 just sqlmesh plan
 ```
 
 ## Data Quality
 
-Both implementations include 11 data quality checks covering:
+Both implementations include comprehensive data quality checks:
 
-- **Null checks** -- no null values in critical columns
-- **Uniqueness** -- no duplicate security IDs per date
-- **Valid values** -- currency codes must be in (USD, EUR, GBP, JPY)
-- **Bounds** -- WACI must be non-negative
+| Category | Checks |
+|----------|--------|
+| **Null checks** | All staging models validated for null values in critical columns |
+| **Uniqueness** | Security master IDs unique, market data ISINs unique per date |
+| **Valid values** | Currency codes (USD, EUR, GBP, JPY), security types, valuation methods |
+| **Bounds** | WACI >= 0, WAGR between 0 and 1 |
+| **Row counts** | Preprocess, harmonize, waterfall, and metrics outputs validated |
 
-**dbt** implements these as singular SQL tests in `tests/`.
-**SQLMesh** implements these as audits in `audits/`, attached directly to model definitions.
+**dbt** implements these as singular SQL tests in `tests/` (32 tests).
+**SQLMesh** implements these as audits in `audits/`, attached directly to model definitions (35 audits).
 
 ## MCP Server
 
-The `packages/mcp/` package provides an [MCP](https://modelcontextprotocol.io/) server for conversational exploration of the pipeline data. It connects to the DuckDB output and exposes tools an LLM can call to query the data.
+The `packages/mcp/` package provides an [MCP](https://modelcontextprotocol.io/) server for conversational exploration of DuckDB databases. It connects to one or two DuckDB files via `ATTACH` and exposes tools an LLM can call.
 
 ### Available tools
 
 | Tool | Description |
 |------|-------------|
-| `list_tables` | Show all tables with row counts |
+| `list_tables` | Show all tables with row counts across all attached databases |
 | `describe_table` | Column names, types, and sample values |
-| `query` | Run arbitrary read-only SQL |
-| `portfolio_summary` | WACI, market value, holdings per portfolio |
-| `holdings_breakdown` | Per-security carbon impact for a portfolio |
-| `top_carbon_contributors` | Securities ranked by carbon intensity |
-| `compare_portfolios` | Side-by-side portfolio comparison |
+| `query` | Run arbitrary read-only SQL (supports cross-database joins) |
 
 ### Usage with Claude Desktop
 
@@ -193,33 +201,34 @@ Add to your `claude_desktop_config.json`:
   "mcpServers": {
     "analytics": {
       "command": "uv",
-      "args": ["run", "analytics-mcp", "--db", "data/dev/output/dbt-warehouse.duckdb"],
+      "args": [
+        "run", "analytics-mcp",
+        "--db", "data/dev/output/dbt-warehouse.duckdb",
+        "--db", "data/dev/output/sqlmesh-warehouse.duckdb"
+      ],
       "cwd": "/path/to/this/repo"
     }
   }
 }
 ```
 
-### Flags
+### CLI usage
 
 ```bash
-# Default: dbt dev database
+# Default: both dbt and SQLMesh databases
 just mcp
 
-# SQLMesh database
-just mcp --db data/dev/output/sqlmesh-warehouse.duckdb
-
-# Explicit path
-just mcp --db /path/to/any.duckdb
+# Single database
+just mcp --db data/dev/output/dbt-warehouse.duckdb
 ```
 
 ## Regenerating Seed Data
 
-Seed data lives in `scripts/generate_seed_data.py` and writes to `data/{env}/input/`:
-
 ```bash
 just seed
 ```
+
+Generates 10 parquet files per environment in `data/{env}/input/`.
 
 ## Linting
 
@@ -231,6 +240,4 @@ just lint
 
 ## Further Reading
 
-- [SQLMesh vs dbt: Detailed Comparison](SQLMESH_VS_DBT.md) -- pros, cons, tradeoffs, integrations with Databricks, Spark, DuckDB, Delta Lake, and Iceberg
-- [dbt Package README](packages/dbt/README.md) -- dbt-specific commands and configuration
-- [SQLMesh Package README](packages/sqlmesh/README.md) -- SQLMesh-specific commands and configuration
+- [SQLMesh vs dbt: Detailed Comparison](SQLMESH_VS_DBT.md)

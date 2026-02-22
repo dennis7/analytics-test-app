@@ -15,20 +15,21 @@ lint:
     uv run ruff check --fix .
     uv run ruff format .
 
-# seed: generate parquet seed data for all environments
+# seed: generate parquet seed data
 seed:
     uv run scripts/generate_seed_data.py
 
-# dbt: run any dbt command (e.g. just dbt build, just dbt test)
+# dbt: run dbt commands (e.g. just dbt build)
 dbt *ARGS:
+    @test -f logs/dbt.log && mv logs/dbt.log "logs/dbt_$(date +%Y_%m_%d_%H_%M_%S).log" || true
     uv run dbt {{ARGS}} --project-dir {{dbt_dir}} --profiles-dir {{dbt_dir}} --log-path logs
 
-# sqlmesh: run any sqlmesh command (e.g. just sqlmesh plan, just sqlmesh run)
+# sqlmesh: run sqlmesh commands (e.g. just sqlmesh plan)
 sqlmesh *ARGS:
     uv run sqlmesh --paths {{sqlmesh_dir}} {{ARGS}}
 
-# mcp: start the MCP server (defaults to dbt dev output)
-mcp *ARGS='--db data/dev/output/dbt-warehouse.duckdb':
+# mcp: start the MCP server for DuckDB exploration
+mcp *ARGS='--db data/dev/output/dbt-warehouse.duckdb --db data/dev/output/sqlmesh-warehouse.duckdb':
     uv run analytics-mcp {{ARGS}}
 
 # test-mcp: run MCP integration tests

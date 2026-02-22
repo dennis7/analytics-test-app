@@ -1,0 +1,166 @@
+version: 2
+
+models:
+  - name: waci_prep_public_securities
+    description: "Public positions mapped to internal security identifiers via ISIN"
+    config:
+      alias: prep_public_securities
+    columns:
+      - name: portfolio_id
+        data_type: varchar
+      - name: internal_id
+        data_type: varchar
+      - name: isin
+        data_type: varchar
+      - name: security_type
+        data_type: varchar
+      - name: sector
+        data_type: varchar
+      - name: entity_id
+        data_type: varchar
+      - name: quantity
+        data_type: double
+      - name: as_of_date
+        data_type: date
+
+  - name: waci_prep_private_securities
+    description: "Private positions mapped to internal security identifiers via fund ID"
+    config:
+      alias: prep_private_securities
+    columns:
+      - name: portfolio_id
+        data_type: varchar
+      - name: internal_id
+        data_type: varchar
+      - name: fund_id
+        data_type: varchar
+      - name: security_type
+        data_type: varchar
+      - name: sector
+        data_type: varchar
+      - name: entity_id
+        data_type: varchar
+      - name: units_held
+        data_type: double
+      - name: as_of_date
+        data_type: date
+
+  - name: waci_harm_valued_positions
+    description: "Unified public and private positions with market values"
+    config:
+      alias: harm_valued_positions
+    columns:
+      - name: portfolio_id
+        data_type: varchar
+      - name: internal_id
+        data_type: varchar
+      - name: security_type
+        data_type: varchar
+      - name: sector
+        data_type: varchar
+      - name: entity_id
+        data_type: varchar
+      - name: market_value
+        data_type: double
+      - name: as_of_date
+        data_type: date
+
+  - name: waci_harm_portfolio_weights
+    description: "Harmonized positions with portfolio weights"
+    config:
+      alias: harm_portfolio_weights
+    columns:
+      - name: portfolio_id
+        data_type: varchar
+      - name: internal_id
+        data_type: varchar
+      - name: security_type
+        data_type: varchar
+      - name: sector
+        data_type: varchar
+      - name: entity_id
+        data_type: varchar
+      - name: market_value
+        data_type: double
+      - name: portfolio_weight
+        data_type: double
+      - name: as_of_date
+        data_type: date
+
+  - name: waci_wf_carbon_intensity
+    description: "Carbon intensity resolved via waterfall: direct, parent, sector"
+    config:
+      alias: wf_carbon_intensity
+    columns:
+      - name: portfolio_id
+        data_type: varchar
+      - name: internal_id
+        data_type: varchar
+      - name: security_type
+        data_type: varchar
+      - name: sector
+        data_type: varchar
+      - name: entity_id
+        data_type: varchar
+      - name: market_value
+        data_type: double
+      - name: portfolio_weight
+        data_type: double
+      - name: resolved_carbon_intensity
+        data_type: double
+      - name: resolution_method
+        data_type: varchar
+      - name: resolution_entity_id
+        data_type: varchar
+      - name: as_of_date
+        data_type: date
+
+  - name: waci_wf_weighted_carbon
+    description: "Resolved carbon intensities weighted by portfolio position"
+    config:
+      alias: wf_weighted_carbon
+    columns:
+      - name: portfolio_id
+        data_type: varchar
+      - name: internal_id
+        data_type: varchar
+      - name: security_type
+        data_type: varchar
+      - name: sector
+        data_type: varchar
+      - name: entity_id
+        data_type: varchar
+      - name: market_value
+        data_type: double
+      - name: portfolio_weight
+        data_type: double
+      - name: resolved_carbon_intensity
+        data_type: double
+      - name: resolution_method
+        data_type: varchar
+      - name: resolution_entity_id
+        data_type: varchar
+      - name: weighted_carbon_intensity
+        data_type: double
+      - name: as_of_date
+        data_type: date
+
+  - name: waci_met_portfolio_waci
+    description: "Weighted Average Carbon Intensity per portfolio"
+    config:
+      alias: met_portfolio_waci
+    columns:
+      - name: portfolio_id
+        data_type: varchar
+      - name: as_of_date
+        data_type: date
+      - name: waci
+        data_type: double
+      - name: total_market_value
+        data_type: double
+      - name: num_holdings
+        data_type: bigint
+      - name: num_public
+        data_type: bigint
+      - name: num_private
+        data_type: bigint

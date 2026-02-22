@@ -1,56 +1,126 @@
 version: 2
 
 models:
-  - name: stg_portfolio_positions
-    description: "Staged portfolio positions with typed columns"
+  - name: stg_public_positions
+    description: "Staged public market portfolio positions"
     columns:
       - name: portfolio_id
-        description: "Unique portfolio identifier"
         data_type: varchar
-      - name: security_id
-        description: "Unique security identifier"
+      - name: isin
         data_type: varchar
       - name: quantity
-        description: "Number of shares/units held"
         data_type: double
       - name: as_of_date
-        description: "Position snapshot date"
         data_type: date
 
-  - name: stg_market_data
-    description: "Staged market prices with typed columns"
+  - name: stg_private_positions
+    description: "Staged private market portfolio positions"
     columns:
-      - name: security_id
-        description: "Unique security identifier"
+      - name: portfolio_id
+        data_type: varchar
+      - name: fund_id
+        data_type: varchar
+      - name: units_held
+        data_type: double
+      - name: as_of_date
+        data_type: date
+
+  - name: stg_public_market_data
+    description: "Staged public market prices"
+    columns:
+      - name: isin
         data_type: varchar
       - name: price
-        description: "Market price per share/unit"
         data_type: double
       - name: currency
-        description: "Price currency (ISO 4217)"
         data_type: varchar
       - name: as_of_date
-        description: "Price observation date"
         data_type: date
 
-  - name: stg_carbon_scores
-    description: "Staged carbon scores with derived carbon intensity"
+  - name: stg_private_valuations
+    description: "Staged private market NAV valuations"
     columns:
-      - name: security_id
-        description: "Unique security identifier"
+      - name: fund_id
         data_type: varchar
-      - name: company_name
-        description: "Company name"
+      - name: nav_per_unit
+        data_type: double
+      - name: valuation_method
+        data_type: varchar
+      - name: as_of_date
+        data_type: date
+
+  - name: stg_security_master
+    description: "Security identifier mapping and classification"
+    columns:
+      - name: internal_id
+        data_type: varchar
+      - name: isin
+        data_type: varchar
+      - name: fund_id
+        data_type: varchar
+      - name: security_type
+        data_type: varchar
+      - name: sector
+        data_type: varchar
+      - name: entity_id
+        data_type: varchar
+
+  - name: stg_entity_carbon
+    description: "Company-level carbon emissions with derived intensity"
+    columns:
+      - name: entity_id
+        data_type: varchar
+      - name: entity_name
         data_type: varchar
       - name: carbon_emissions_tonnes
-        description: "Total carbon emissions in metric tonnes"
         data_type: double
       - name: revenue_usd
-        description: "Total revenue in USD"
         data_type: double
       - name: carbon_intensity
-        description: "Carbon intensity = emissions / revenue (tonnes per USD)"
         data_type: double
       - name: as_of_date
-        description: "Carbon data observation date"
+        data_type: date
+
+  - name: stg_entity_hierarchy
+    description: "Subsidiary to parent entity mapping"
+    columns:
+      - name: child_entity_id
+        data_type: varchar
+      - name: parent_entity_id
+        data_type: varchar
+
+  - name: stg_sector_carbon
+    description: "Sector average carbon intensities"
+    columns:
+      - name: sector
+        data_type: varchar
+      - name: avg_carbon_intensity
+        data_type: double
+      - name: as_of_date
+        data_type: date
+
+  - name: stg_entity_green_revenue
+    description: "Company-level green revenue with derived share"
+    columns:
+      - name: entity_id
+        data_type: varchar
+      - name: entity_name
+        data_type: varchar
+      - name: green_revenue_usd
+        data_type: double
+      - name: total_revenue_usd
+        data_type: double
+      - name: green_revenue_share
+        data_type: double
+      - name: as_of_date
+        data_type: date
+
+  - name: stg_sector_green_revenue
+    description: "Sector average green revenue shares"
+    columns:
+      - name: sector
+        data_type: varchar
+      - name: avg_green_revenue_share
+        data_type: double
+      - name: as_of_date
         data_type: date
