@@ -8,7 +8,7 @@ A SQLMesh project for computing portfolio analytics, powered by DuckDB.
 
 ```bash
 # From the repo root
-uv sync
+just sync
 just seed
 just sqlmesh plan
 ```

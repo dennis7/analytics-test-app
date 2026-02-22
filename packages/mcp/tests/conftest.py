@@ -94,7 +94,7 @@ def test_db(tmp_path_factory):
     conn.execute("""
         CREATE TABLE marts.fct_portfolio_waci (
             portfolio_id VARCHAR, as_of_date DATE, waci DOUBLE,
-            total_market_value DOUBLE, num_holdings INTEGER
+            total_market_value DOUBLE, num_holdings BIGINT
         )
     """)
     conn.execute("""
