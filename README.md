@@ -48,11 +48,8 @@ A monorepo containing **two parallel implementations** of an analytics data pipe
 ## Quick Start
 
 ```bash
-# Install all dependencies (one shared venv for the entire workspace)
-uv sync
-
-# Install dbt packages (dbt_utils)
-just dbt deps
+# Install all dependencies (Python + dbt packages)
+just sync
 
 # Generate seed data for all environments
 just seed
@@ -101,6 +98,7 @@ The root `pyproject.toml` aggregates everything and adds shared dev dependencies
 All commands are run from the repo root via [just](https://just.systems/):
 
 ```bash
+just sync              # Install Python + dbt dependencies
 just seed              # Generate seed data
 just lint              # Run ruff linter and formatter
 just dbt build         # Run dbt pipeline

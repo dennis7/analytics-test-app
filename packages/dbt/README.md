@@ -8,8 +8,7 @@ A dbt project for computing portfolio analytics, powered by DuckDB.
 
 ```bash
 # From the repo root
-uv sync
-just dbt deps
+just sync
 just seed
 just dbt build
 ```
@@ -27,7 +26,7 @@ packages/dbt/
 ├── macros/                    # Reusable SQL macros
 ├── dbt_project.yml            # dbt project configuration
 ├── profiles.yml               # Connection profiles (DuckDB)
-├── packages.yml               # dbt package dependencies
+├── packages.yml               # dbt package dependencies (dbt_utils)
 └── pyproject.toml             # Workspace member (dbt-specific deps)
 ```
 

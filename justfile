@@ -5,6 +5,11 @@ export DATA_DIR := justfile_directory() / "data"
 dbt_dir := "packages/dbt"
 sqlmesh_dir := "packages/sqlmesh"
 
+# sync: install all Python and dbt dependencies
+sync:
+    uv sync --group dev
+    uv run dbt deps --project-dir {{dbt_dir}} --profiles-dir {{dbt_dir}}
+
 # lint: run ruff linter and formatter
 lint:
     uv run ruff check --fix .
