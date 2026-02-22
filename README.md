@@ -155,13 +155,10 @@ Both implementations support two environments:
 
 ### Single-date filtering
 
-Both pipelines support running for a single reporting date:
+Both pipelines read the `REPORTING_DATE` environment variable. When unset, all dates are processed.
 
 ```bash
-# dbt -- pass reporting_date var
-just dbt build --vars "'{\"reporting_date\": \"2025-12-31\"}'"
-
-# SQLMesh -- set REPORTING_DATE env var
+REPORTING_DATE=2025-12-31 just dbt build
 REPORTING_DATE=2025-12-31 just sqlmesh plan
 ```
 

@@ -13,7 +13,7 @@ clean-targets:
   - "dbt_packages"
 
 vars:
-  reporting_date: ""
+  reporting_date: "{{ env_var('REPORTING_DATE', '') }}"
 
 models:
   test_app:

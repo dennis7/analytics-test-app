@@ -21,11 +21,10 @@ just mcp               # Start MCP server
 
 ### Single-date filtering
 
-```bash
-# dbt -- note the extra quoting required by justfile *ARGS
-just dbt build --vars "'{\"reporting_date\": \"2025-12-31\"}'"
+Both pipelines read the `REPORTING_DATE` env var. When unset, all dates are processed.
 
-# SQLMesh -- env var
+```bash
+REPORTING_DATE=2025-12-31 just dbt build
 REPORTING_DATE=2025-12-31 just sqlmesh plan
 ```
 
