@@ -54,7 +54,7 @@ The pipeline computes two standard ESG metrics:
 
 - [Python 3.12+](https://www.python.org/downloads/)
 - [uv](https://docs.astral.sh/uv/getting-started/installation/)
-- [just](https://just.systems/man/en/installation.html)
+- [just](https://just.systems/man/en/packages.html)
 
 ## Quick Start
 
